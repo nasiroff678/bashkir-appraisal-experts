@@ -46,20 +46,14 @@ const ContactSection = () => {
   };
 
   const sendToTelegram = async (data: typeof formData) => {
-    const typeName = EVALUATION_TYPES.find(t => t.value === data.type)?.label || data.type;
+    const typeName = EVALUATION_TYPES.find(t => t.value === data.type)?.label || data.type || "Не указан";
     const message = `🆕 Новая заявка с сайта!\n\n👤 Имя: ${data.name}\n📞 Телефон: ${data.phone}\n📋 Тип оценки: ${typeName}\n💬 Комментарий: ${data.comment || "Не указан"}`;
     
     try {
-      const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: TELEGRAM_CHAT_ID,
-          text: message,
-          parse_mode: "HTML"
-        })
-      });
-      return response.ok;
+      const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${encodeURIComponent(message)}`;
+      const response = await fetch(url, { method: "GET" });
+      const result = await response.json();
+      return result.ok === true;
     } catch (error) {
       console.error("Telegram error:", error);
       return false;

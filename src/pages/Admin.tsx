@@ -35,7 +35,9 @@ const Admin = () => {
 
   const loadSubmissions = () => {
     const data = JSON.parse(localStorage.getItem("formSubmissions") || "[]");
-    setSubmissions(data.reverse());
+    // Sort by date descending (newest first)
+    const sorted = [...data].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setSubmissions(sorted);
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -57,9 +59,11 @@ const Admin = () => {
   };
 
   const handleDelete = (id: number) => {
+    const allData = JSON.parse(localStorage.getItem("formSubmissions") || "[]");
+    const updatedData = allData.filter((s: Submission) => s.id !== id);
+    localStorage.setItem("formSubmissions", JSON.stringify(updatedData));
     const updatedSubmissions = submissions.filter(s => s.id !== id);
     setSubmissions(updatedSubmissions);
-    localStorage.setItem("formSubmissions", JSON.stringify(updatedSubmissions.reverse()));
     toast({ title: "Заявка удалена" });
   };
 

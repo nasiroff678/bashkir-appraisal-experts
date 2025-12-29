@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Phone, MessageCircle, Menu, X } from "lucide-react";
 import logo from "@/assets/logo.png";
+import RequestFormDialog from "@/components/RequestFormDialog";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -49,11 +50,13 @@ const Header = () => {
                 WhatsApp
               </Button>
             </a>
-            <a href="#contacts">
-              <Button variant="hero" size="sm">
-                Заказать оценку
-              </Button>
-            </a>
+            <RequestFormDialog 
+              trigger={
+                <Button variant="hero" size="sm">
+                  Заказать оценку
+                </Button>
+              }
+            />
           </div>
 
           {/* Mobile Menu Button */}
@@ -92,11 +95,13 @@ const Header = () => {
                       WhatsApp
                     </Button>
                   </a>
-                  <a href="#contacts" className="flex-1" onClick={() => setIsMenuOpen(false)}>
-                    <Button variant="hero" size="sm" className="w-full">
-                      Заказать
-                    </Button>
-                  </a>
+                  <RequestFormDialog 
+                    trigger={
+                      <Button variant="hero" size="sm" className="w-full">
+                        Заказать
+                      </Button>
+                    }
+                  />
                 </div>
               </div>
             </nav>

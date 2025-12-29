@@ -40,10 +40,19 @@ const RequestFormDialog = ({ children, trigger, defaultService }: RequestFormDia
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    phone: "",
+    phone: "+7 ",
     type: defaultService || "",
     comment: "",
   });
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+    // Ensure phone always starts with +7
+    if (!value.startsWith("+7")) {
+      value = "+7 " + value.replace(/^\+?7?\s*/, "");
+    }
+    setFormData({ ...formData, phone: value });
+  };
   const [captcha, setCaptcha] = useState(generateCaptcha());
   const [captchaInput, setCaptchaInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -134,7 +143,7 @@ const RequestFormDialog = ({ children, trigger, defaultService }: RequestFormDia
       });
     }
 
-    setFormData({ name: "", phone: "", type: "", comment: "" });
+    setFormData({ name: "", phone: "+7 ", type: "", comment: "" });
     refreshCaptcha();
     setOpen(false);
   };
@@ -167,7 +176,7 @@ const RequestFormDialog = ({ children, trigger, defaultService }: RequestFormDia
               type="tel"
               placeholder="+7 (___) ___-__-__"
               value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              onChange={handlePhoneChange}
               required
               className="h-12"
             />

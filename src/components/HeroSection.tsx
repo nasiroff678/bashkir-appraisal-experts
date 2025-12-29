@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { CheckCircle, ArrowRight } from "lucide-react";
+import RequestFormDialog from "./RequestFormDialog";
 
 const HeroSection = () => {
   const advantages = [
@@ -49,12 +50,12 @@ const HeroSection = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up" style={{ animationDelay: "0.4s" }}>
-            <a href="#contacts">
+            <RequestFormDialog>
               <Button variant="hero" size="xl">
                 Рассчитать стоимость оценки
                 <ArrowRight className="w-5 h-5" />
               </Button>
-            </a>
+            </RequestFormDialog>
             <a href="tel:+79270809567">
               <Button variant="outline" size="xl">
                 Позвонить сейчас

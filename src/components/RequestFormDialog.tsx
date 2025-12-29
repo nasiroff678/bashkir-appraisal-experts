@@ -30,21 +30,38 @@ const generateCaptcha = () => {
 };
 
 interface RequestFormDialogProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  trigger?: React.ReactNode;
+  defaultService?: string;
 }
 
-const RequestFormDialog = ({ children }: RequestFormDialogProps) => {
+const RequestFormDialog = ({ children, trigger, defaultService }: RequestFormDialogProps) => {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
-    type: "",
+    type: defaultService || "",
     comment: "",
   });
   const [captcha, setCaptcha] = useState(generateCaptcha());
   const [captchaInput, setCaptchaInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Update type when defaultService changes and dialog opens
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (isOpen && defaultService) {
+      // Try to match defaultService with EVALUATION_TYPES
+      const matchedType = EVALUATION_TYPES.find(t => 
+        t.label.toLowerCase().includes(defaultService.toLowerCase()) ||
+        defaultService.toLowerCase().includes(t.label.toLowerCase())
+      );
+      if (matchedType) {
+        setFormData(prev => ({ ...prev, type: matchedType.value }));
+      }
+    }
+  };
 
   const refreshCaptcha = () => {
     setCaptcha(generateCaptcha());
@@ -123,9 +140,9 @@ const RequestFormDialog = ({ children }: RequestFormDialogProps) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        {children}
+        {trigger || children}
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>

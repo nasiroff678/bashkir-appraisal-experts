@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import RequestFormDialog from "@/components/RequestFormDialog";
 
 type ObjectType = "apartment" | "house" | "land" | "commercial" | "car" | "equipment" | "business" | "damage";
 
@@ -195,15 +196,14 @@ const PriceCalculator = () => {
                   <Button onClick={handleWhatsApp} variant="whatsapp" size="lg">
                     Уточнить в WhatsApp
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => {
-                      document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
-                    }}
-                  >
-                    Оставить заявку
-                  </Button>
+                  <RequestFormDialog 
+                    trigger={
+                      <Button variant="outline" size="lg">
+                        Оставить заявку
+                      </Button>
+                    }
+                    defaultService={objectTypes.find(t => t.value === objectType)?.label}
+                  />
                 </div>
               </div>
             </div>

@@ -1,4 +1,6 @@
 import { Building2, Car, Wrench, Briefcase, AlertTriangle, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import RequestFormDialog from "@/components/RequestFormDialog";
 
 const services = [
   {
@@ -71,7 +73,7 @@ const ServicesSection = () => {
               <p className="text-muted-foreground text-sm mb-4">{service.description}</p>
 
               {/* Purpose Tags */}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 mb-4">
                 {service.purposes.map((purpose, idx) => (
                   <span
                     key={idx}
@@ -81,6 +83,16 @@ const ServicesSection = () => {
                   </span>
                 ))}
               </div>
+
+              {/* Order Button */}
+              <RequestFormDialog 
+                trigger={
+                  <Button variant="outline" size="sm" className="w-full">
+                    Заказать оценку
+                  </Button>
+                }
+                defaultService={service.title}
+              />
             </div>
           ))}
         </div>

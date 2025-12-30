@@ -10,12 +10,10 @@ import FAQSection from "@/components/FAQSection";
 import ContactSection from "@/components/ContactSection";
 import Footer from "@/components/Footer";
 import ScrollToTop from "@/components/ScrollToTop";
-import BackgroundDecoration from "@/components/BackgroundDecoration";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-background relative">
-      <BackgroundDecoration />
+    <div className="min-h-screen bg-background">
       <Header />
       <main>
         <HeroSection />

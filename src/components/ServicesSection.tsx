@@ -61,7 +61,7 @@ const ServicesSection = () => {
           {services.map((service, index) => (
             <div
               key={index}
-              className="group bg-card rounded-xl p-6 card-shadow hover:card-shadow-hover transition-all duration-300 hover:-translate-y-1 border border-border/50"
+              className="group bg-card rounded-xl p-6 card-shadow hover:card-shadow-hover transition-all duration-300 hover:-translate-y-1 border border-border/50 flex flex-col h-full"
             >
               {/* Icon */}
               <div className="w-14 h-14 rounded-xl bg-gradient-hero flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
@@ -73,11 +73,11 @@ const ServicesSection = () => {
               <p className="text-muted-foreground text-sm mb-4">{service.description}</p>
 
               {/* Purpose Tags */}
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4 flex-grow">
                 {service.purposes.map((purpose, idx) => (
                   <span
                     key={idx}
-                    className="text-xs font-medium px-2.5 py-1 bg-primary/10 text-primary rounded-full"
+                    className="text-xs font-medium px-2.5 py-1 bg-primary/10 text-primary rounded-full h-fit"
                   >
                     {purpose}
                   </span>
@@ -87,7 +87,7 @@ const ServicesSection = () => {
               {/* Order Button */}
               <RequestFormDialog 
                 trigger={
-                  <Button variant="outline" size="sm" className="w-full">
+                  <Button variant="outline" size="sm" className="w-full mt-auto">
                     Заказать оценку
                   </Button>
                 }

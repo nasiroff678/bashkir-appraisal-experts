@@ -6,8 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Send, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useCreateSubmission } from "@/hooks/useSubmissions";
+import { useSettings } from "@/hooks/useSettings";
+import { IntegrationsSettings, EvaluationTypesSettings } from "@/types/content";
 
-const EVALUATION_TYPES = [
+const DEFAULT_EVALUATION_TYPES = [
   { value: "apartment", label: "Оценка квартиры" },
   { value: "house", label: "Оценка дома" },
   { value: "land", label: "Оценка земельного участка" },
@@ -19,9 +22,6 @@ const EVALUATION_TYPES = [
   { value: "inheritance", label: "Оценка для наследства" },
   { value: "other", label: "Другое" },
 ];
-
-const TELEGRAM_BOT_TOKEN = "8223684027:AAGkaI_YewHQUeoSaZ2EqfLVOnmvKhRSIv8";
-const TELEGRAM_CHAT_ID = "8271729626";
 
 const generateCaptcha = () => {
   const num1 = Math.floor(Math.random() * 10) + 1;
@@ -37,6 +37,19 @@ interface RequestFormDialogProps {
 
 const RequestFormDialog = ({ children, trigger, defaultService }: RequestFormDialogProps) => {
   const { toast } = useToast();
+  const createSubmission = useCreateSubmission();
+  
+  // Load settings from database
+  const { settings: integrations } = useSettings<IntegrationsSettings>('integrations', {
+    telegram_bot_token: '',
+    telegram_chat_id: ''
+  });
+  const { settings: evalTypesSettings } = useSettings<EvaluationTypesSettings>('evaluation_types', { 
+    items: DEFAULT_EVALUATION_TYPES 
+  });
+  
+  const evaluationTypes = evalTypesSettings.items || DEFAULT_EVALUATION_TYPES;
+  
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -47,22 +60,20 @@ const RequestFormDialog = ({ children, trigger, defaultService }: RequestFormDia
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
-    // Ensure phone always starts with +7
     if (!value.startsWith("+7")) {
       value = "+7 " + value.replace(/^\+?7?\s*/, "");
     }
     setFormData({ ...formData, phone: value });
   };
+  
   const [captcha, setCaptcha] = useState(generateCaptcha());
   const [captchaInput, setCaptchaInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Update type when defaultService changes and dialog opens
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
     if (isOpen && defaultService) {
-      // Try to match defaultService with EVALUATION_TYPES
-      const matchedType = EVALUATION_TYPES.find(t => 
+      const matchedType = evaluationTypes.find(t => 
         t.label.toLowerCase().includes(defaultService.toLowerCase()) ||
         defaultService.toLowerCase().includes(t.label.toLowerCase())
       );
@@ -78,11 +89,15 @@ const RequestFormDialog = ({ children, trigger, defaultService }: RequestFormDia
   };
 
   const sendToTelegram = async (data: typeof formData) => {
-    const typeName = EVALUATION_TYPES.find(t => t.value === data.type)?.label || data.type || "Не указан";
+    if (!integrations.telegram_bot_token || !integrations.telegram_chat_id) {
+      return false;
+    }
+    
+    const typeName = evaluationTypes.find(t => t.value === data.type)?.label || data.type || "Не указан";
     const message = `🆕 Новая заявка с сайта!\n\n👤 Имя: ${data.name}\n📞 Телефон: ${data.phone}\n📋 Тип оценки: ${typeName}\n💬 Комментарий: ${data.comment || "Не указан"}`;
     
     try {
-      const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${encodeURIComponent(message)}`;
+      const url = `https://api.telegram.org/bot${integrations.telegram_bot_token}/sendMessage?chat_id=${integrations.telegram_chat_id}&text=${encodeURIComponent(message)}`;
       const response = await fetch(url, { method: "GET" });
       const result = await response.json();
       return result.ok === true;
@@ -90,18 +105,6 @@ const RequestFormDialog = ({ children, trigger, defaultService }: RequestFormDia
       console.error("Telegram error:", error);
       return false;
     }
-  };
-
-  const saveToLocalStorage = (data: typeof formData) => {
-    const submissions = JSON.parse(localStorage.getItem("formSubmissions") || "[]");
-    const newSubmission = {
-      ...data,
-      id: Date.now(),
-      date: new Date().toISOString(),
-      typeName: EVALUATION_TYPES.find(t => t.value === data.type)?.label || data.type
-    };
-    submissions.push(newSubmission);
-    localStorage.setItem("formSubmissions", JSON.stringify(submissions));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,25 +130,40 @@ const RequestFormDialog = ({ children, trigger, defaultService }: RequestFormDia
     }
 
     setIsSubmitting(true);
-    saveToLocalStorage(formData);
-    const telegramSent = await sendToTelegram(formData);
-    setIsSubmitting(false);
-
-    if (telegramSent) {
+    
+    const typeName = evaluationTypes.find(t => t.value === formData.type)?.label || formData.type;
+    
+    try {
+      // Save to database
+      await createSubmission.mutateAsync({
+        name: formData.name,
+        phone: formData.phone,
+        evaluation_type: formData.type || undefined,
+        evaluation_type_label: typeName || undefined,
+        comment: formData.comment || undefined,
+      });
+      
+      // Send to Telegram (non-blocking)
+      sendToTelegram(formData);
+      
       toast({
         title: "Заявка отправлена!",
         description: "Мы свяжемся с вами в ближайшее время.",
       });
-    } else {
+      
+      setFormData({ name: "", phone: "+7 ", type: "", comment: "" });
+      refreshCaptcha();
+      setOpen(false);
+    } catch (error) {
+      console.error("Submit error:", error);
       toast({
-        title: "Заявка сохранена",
-        description: "Мы получили вашу заявку и скоро свяжемся.",
+        title: "Ошибка",
+        description: "Не удалось отправить заявку. Попробуйте позже.",
+        variant: "destructive"
       });
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setFormData({ name: "", phone: "+7 ", type: "", comment: "" });
-    refreshCaptcha();
-    setOpen(false);
   };
 
   return (
@@ -188,7 +206,7 @@ const RequestFormDialog = ({ children, trigger, defaultService }: RequestFormDia
                 <SelectValue placeholder="Выберите тип оценки" />
               </SelectTrigger>
               <SelectContent className="bg-background border border-border z-[60]">
-                {EVALUATION_TYPES.map((type) => (
+                {evaluationTypes.map((type) => (
                   <SelectItem key={type.value} value={type.value}>
                     {type.label}
                   </SelectItem>

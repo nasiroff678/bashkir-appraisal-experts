@@ -1,12 +1,22 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Phone, MapPin, MessageCircle, Send, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useCreateSubmission } from "@/hooks/useSubmissions";
+import { useSettings } from "@/hooks/useSettings";
+import { useContent } from "@/hooks/useContent";
+import { 
+  IntegrationsSettings, 
+  EvaluationTypesSettings, 
+  ContactsContent,
+  ContactSettings,
+  SocialSettings 
+} from "@/types/content";
 
-const EVALUATION_TYPES = [
+const DEFAULT_EVALUATION_TYPES = [
   { value: "apartment", label: "Оценка квартиры" },
   { value: "house", label: "Оценка дома" },
   { value: "land", label: "Оценка земельного участка" },
@@ -19,8 +29,18 @@ const EVALUATION_TYPES = [
   { value: "other", label: "Другое" },
 ];
 
-const TELEGRAM_BOT_TOKEN = "8223684027:AAGkaI_YewHQUeoSaZ2EqfLVOnmvKhRSIv8";
-const TELEGRAM_CHAT_ID = "8271729626";
+const CONTACTS_FALLBACK: ContactsContent = {
+  badge: "Контакты",
+  title: "Оставьте заявку",
+  description: "Свяжемся с вами, уточним задачу и назовём стоимость оценки",
+  form_title: "Форма заявки",
+  phone: "+7 (927) 080-95-67",
+  phone_link: "+79270809567",
+  address: "РБ, г. Дюртюли, ул. Ленина, д. 8, оф. 202",
+  whatsapp_link: "https://wa.me/79270809567",
+  telegram_link: "https://t.me/+79270809567",
+  map_embed_url: ""
+};
 
 const generateCaptcha = () => {
   const num1 = Math.floor(Math.random() * 10) + 1;
@@ -30,6 +50,32 @@ const generateCaptcha = () => {
 
 const ContactSection = () => {
   const { toast } = useToast();
+  const createSubmission = useCreateSubmission();
+  
+  // Load content and settings from database
+  const { content, isVisible } = useContent<ContactsContent>('contacts', CONTACTS_FALLBACK);
+  const { settings: integrations } = useSettings<IntegrationsSettings>('integrations', {
+    telegram_bot_token: '',
+    telegram_chat_id: ''
+  });
+  const { settings: evalTypesSettings } = useSettings<EvaluationTypesSettings>('evaluation_types', { 
+    items: DEFAULT_EVALUATION_TYPES 
+  });
+  const { settings: contactSettings } = useSettings<ContactSettings>('contacts', {
+    phone: '+7 (927) 080-95-67',
+    phone_link: '+79270809567',
+    address: 'РБ, г. Дюртюли, ул. Ленина, д. 8, оф. 202',
+    email: ''
+  });
+  const { settings: socialSettings } = useSettings<SocialSettings>('social', {
+    whatsapp: 'https://wa.me/79270809567',
+    telegram: 'https://t.me/+79270809567',
+    vk: '',
+    instagram: ''
+  });
+  
+  const evaluationTypes = evalTypesSettings.items || DEFAULT_EVALUATION_TYPES;
+  
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -46,11 +92,15 @@ const ContactSection = () => {
   };
 
   const sendToTelegram = async (data: typeof formData) => {
-    const typeName = EVALUATION_TYPES.find(t => t.value === data.type)?.label || data.type || "Не указан";
+    if (!integrations.telegram_bot_token || !integrations.telegram_chat_id) {
+      return false;
+    }
+    
+    const typeName = evaluationTypes.find(t => t.value === data.type)?.label || data.type || "Не указан";
     const message = `🆕 Новая заявка с сайта!\n\n👤 Имя: ${data.name}\n📞 Телефон: ${data.phone}\n📋 Тип оценки: ${typeName}\n💬 Комментарий: ${data.comment || "Не указан"}`;
     
     try {
-      const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${encodeURIComponent(message)}`;
+      const url = `https://api.telegram.org/bot${integrations.telegram_bot_token}/sendMessage?chat_id=${integrations.telegram_chat_id}&text=${encodeURIComponent(message)}`;
       const response = await fetch(url, { method: "GET" });
       const result = await response.json();
       return result.ok === true;
@@ -58,18 +108,6 @@ const ContactSection = () => {
       console.error("Telegram error:", error);
       return false;
     }
-  };
-
-  const saveToLocalStorage = (data: typeof formData) => {
-    const submissions = JSON.parse(localStorage.getItem("formSubmissions") || "[]");
-    const newSubmission = {
-      ...data,
-      id: Date.now(),
-      date: new Date().toISOString(),
-      typeName: EVALUATION_TYPES.find(t => t.value === data.type)?.label || data.type
-    };
-    submissions.push(newSubmission);
-    localStorage.setItem("formSubmissions", JSON.stringify(submissions));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -95,49 +133,61 @@ const ContactSection = () => {
     }
 
     setIsSubmitting(true);
+    
+    const typeName = evaluationTypes.find(t => t.value === formData.type)?.label || formData.type;
 
-    // Save to localStorage for admin panel
-    saveToLocalStorage(formData);
-
-    // Send to Telegram
-    const telegramSent = await sendToTelegram(formData);
-
-    setIsSubmitting(false);
-
-    if (telegramSent) {
+    try {
+      // Save to database
+      await createSubmission.mutateAsync({
+        name: formData.name,
+        phone: formData.phone,
+        evaluation_type: formData.type || undefined,
+        evaluation_type_label: typeName || undefined,
+        comment: formData.comment || undefined,
+      });
+      
+      // Send to Telegram (non-blocking)
+      sendToTelegram(formData);
+      
       toast({
         title: "Заявка отправлена!",
         description: "Мы свяжемся с вами в ближайшее время.",
       });
-    } else {
+      
+      setFormData({ name: "", phone: "", type: "", comment: "" });
+      refreshCaptcha();
+    } catch (error) {
+      console.error("Submit error:", error);
       toast({
-        title: "Заявка сохранена",
-        description: "Мы получили вашу заявку и скоро свяжемся.",
+        title: "Ошибка",
+        description: "Не удалось отправить заявку. Попробуйте позже.",
+        variant: "destructive"
       });
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setFormData({ name: "", phone: "", type: "", comment: "" });
-    refreshCaptcha();
   };
+
+  if (!isVisible) return null;
 
   return (
     <section id="contacts" className="py-16 lg:py-24 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5">
       <div className="container mx-auto">
         {/* Section Header */}
         <div className="text-center max-w-2xl mx-auto mb-12 lg:mb-16">
-          <span className="text-sm font-semibold text-secondary uppercase tracking-wider">Контакты</span>
+          <span className="text-sm font-semibold text-secondary uppercase tracking-wider">{content.badge}</span>
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-foreground mt-2 mb-4">
-            Оставьте заявку
+            {content.title}
           </h2>
           <p className="text-muted-foreground">
-            Свяжемся с вами, уточним задачу и назовём стоимость оценки
+            {content.description}
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           {/* Contact Form */}
           <div className="bg-card rounded-2xl p-6 lg:p-8 border border-border/50 card-shadow">
-            <h3 className="text-xl font-heading font-bold text-foreground mb-6">Форма заявки</h3>
+            <h3 className="text-xl font-heading font-bold text-foreground mb-6">{content.form_title}</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">Ваше имя *</label>
@@ -168,7 +218,7 @@ const ContactSection = () => {
                     <SelectValue placeholder="Выберите тип оценки" />
                   </SelectTrigger>
                   <SelectContent className="bg-background border border-border z-50">
-                    {EVALUATION_TYPES.map((type) => (
+                    {evaluationTypes.map((type) => (
                       <SelectItem key={type.value} value={type.value}>
                         {type.label}
                       </SelectItem>
@@ -229,13 +279,13 @@ const ContactSection = () => {
               <h3 className="text-xl font-heading font-bold text-foreground mb-5">Контактная информация</h3>
               
               <div className="space-y-4">
-                <a href="tel:+79270809567" className="flex items-center gap-4 group">
+                <a href={`tel:${contactSettings.phone_link}`} className="flex items-center gap-4 group">
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                     <Phone className="w-5 h-5 text-primary" />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Телефон</p>
-                    <p className="font-semibold text-foreground">+7 (927) 080-95-67</p>
+                    <p className="font-semibold text-foreground">{contactSettings.phone}</p>
                   </div>
                 </a>
 
@@ -245,41 +295,47 @@ const ContactSection = () => {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Адрес</p>
-                    <p className="font-semibold text-foreground">РБ, г. Дюртюли, ул. Ленина, д. 8, оф. 202</p>
+                    <p className="font-semibold text-foreground">{contactSettings.address}</p>
                   </div>
                 </div>
               </div>
 
               {/* Messenger Buttons */}
               <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-6 border-t border-border">
-                <a href="https://wa.me/79270809567" target="_blank" rel="noopener noreferrer" className="flex-1">
-                  <Button variant="whatsapp" size="lg" className="w-full">
-                    <MessageCircle className="w-5 h-5" />
-                    Написать в WhatsApp
-                  </Button>
-                </a>
-                <a href="https://t.me/+79270809567" target="_blank" rel="noopener noreferrer" className="flex-1">
-                  <Button variant="telegram" size="lg" className="w-full">
-                    <Send className="w-5 h-5" />
-                    Написать в Telegram
-                  </Button>
-                </a>
+                {socialSettings.whatsapp && (
+                  <a href={socialSettings.whatsapp} target="_blank" rel="noopener noreferrer" className="flex-1">
+                    <Button variant="whatsapp" size="lg" className="w-full">
+                      <MessageCircle className="w-5 h-5" />
+                      Написать в WhatsApp
+                    </Button>
+                  </a>
+                )}
+                {socialSettings.telegram && (
+                  <a href={socialSettings.telegram} target="_blank" rel="noopener noreferrer" className="flex-1">
+                    <Button variant="telegram" size="lg" className="w-full">
+                      <Send className="w-5 h-5" />
+                      Написать в Telegram
+                    </Button>
+                  </a>
+                )}
               </div>
             </div>
 
             {/* Map */}
-            <div className="bg-card rounded-2xl overflow-hidden border border-border/50 card-shadow h-64 lg:h-72">
-              <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2205.5!2d55.4869!3d55.4942!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNTXCsDI5JzM5LjEiTiA1NcKwMjknMTIuOCJF!5e0!3m2!1sru!2sru!4v1609459200000!5m2!1sru!2sru"
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                allowFullScreen
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                title="Офис в Дюртюлях"
-              />
-            </div>
+            {content.map_embed_url && (
+              <div className="bg-card rounded-2xl overflow-hidden border border-border/50 card-shadow h-64 lg:h-72">
+                <iframe
+                  src={content.map_embed_url}
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  title="Офис в Дюртюлях"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

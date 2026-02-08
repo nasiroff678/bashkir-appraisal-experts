@@ -10,6 +10,7 @@ import FAQSection from "@/components/FAQSection";
 import ContactSection from "@/components/ContactSection";
 import Footer from "@/components/Footer";
 import ScrollToTop from "@/components/ScrollToTop";
+import AIChatWidget from "@/components/AIChatWidget";
 
 const Index = () => {
   return (
@@ -28,6 +29,7 @@ const Index = () => {
       </main>
       <Footer />
       <ScrollToTop />
+      <AIChatWidget />
     </div>
   );
 };

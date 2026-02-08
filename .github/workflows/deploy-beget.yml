@@ -35,4 +35,4 @@ jobs:
           protocol: ftp
           port: 21
           server-dir: ${{ secrets.FTP_SERVER_DIR }}
-          local-dir: ./dist
+          local-dir: ./dist/

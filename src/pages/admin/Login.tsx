@@ -3,18 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Lock, ArrowLeft, Mail } from "lucide-react";
+import { Lock, ArrowLeft, Mail, UserPlus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
 const AdminLogin = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { signIn, user, isAdmin, isLoading: authLoading } = useAuth();
+  const { signIn, signUp, user, isAdmin, isLoading: authLoading } = useAuth();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
 
   // Redirect if already logged in as admin
   if (!authLoading && user && isAdmin) {
@@ -22,7 +23,7 @@ const AdminLogin = () => {
     return null;
   }
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!email || !password) {
@@ -33,28 +34,63 @@ const AdminLogin = () => {
       return;
     }
 
-    setIsLoading(true);
-    
-    const { error } = await signIn(email, password);
-    
-    if (error) {
-      let message = "Ошибка входа";
-      if (error.message.includes("Invalid login credentials")) {
-        message = "Неверный email или пароль";
-      } else if (error.message.includes("Email not confirmed")) {
-        message = "Email не подтверждён. Проверьте почту.";
-      }
-      
+    if (password.length < 6) {
       toast({
-        title: message,
+        title: "Пароль должен быть не менее 6 символов",
         variant: "destructive",
       });
-      setIsLoading(false);
       return;
     }
 
-    toast({ title: "Успешный вход" });
-    navigate("/admin/dashboard", { replace: true });
+    setIsLoading(true);
+    
+    if (isSignUp) {
+      const { error } = await signUp(email, password);
+      
+      if (error) {
+        let message = "Ошибка регистрации";
+        if (error.message.includes("already registered")) {
+          message = "Пользователь с таким email уже зарегистрирован";
+        } else if (error.message.includes("invalid")) {
+          message = "Неверный формат email";
+        }
+        
+        toast({
+          title: message,
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      toast({ 
+        title: "Регистрация успешна!", 
+        description: "Проверьте почту для подтверждения email"
+      });
+      setIsSignUp(false);
+      setIsLoading(false);
+    } else {
+      const { error } = await signIn(email, password);
+      
+      if (error) {
+        let message = "Ошибка входа";
+        if (error.message.includes("Invalid login credentials")) {
+          message = "Неверный email или пароль";
+        } else if (error.message.includes("Email not confirmed")) {
+          message = "Email не подтверждён. Проверьте почту.";
+        }
+        
+        toast({
+          title: message,
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      toast({ title: "Успешный вход" });
+      navigate("/admin/dashboard", { replace: true });
+    }
   };
 
   return (
@@ -62,17 +98,21 @@ const AdminLogin = () => {
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Lock className="w-8 h-8 text-primary" />
+            {isSignUp ? (
+              <UserPlus className="w-8 h-8 text-primary" />
+            ) : (
+              <Lock className="w-8 h-8 text-primary" />
+            )}
           </div>
           <h1 className="text-2xl font-heading font-bold text-foreground">
-            Вход в админ-панель
+            {isSignUp ? "Регистрация" : "Вход в админ-панель"}
           </h1>
           <p className="text-muted-foreground mt-2">
-            Введите данные для доступа
+            {isSignUp ? "Создайте аккаунт для доступа" : "Введите данные для доступа"}
           </p>
         </div>
         
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -108,9 +148,20 @@ const AdminLogin = () => {
             className="w-full"
             disabled={isLoading}
           >
-            {isLoading ? "Вход..." : "Войти"}
+            {isLoading ? (isSignUp ? "Регистрация..." : "Вход...") : (isSignUp ? "Зарегистрироваться" : "Войти")}
           </Button>
         </form>
+
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={() => setIsSignUp(!isSignUp)}
+            className="text-sm text-primary hover:underline"
+            disabled={isLoading}
+          >
+            {isSignUp ? "Уже есть аккаунт? Войти" : "Нет аккаунта? Зарегистрироваться"}
+          </button>
+        </div>
         
         <Button
           variant="ghost"

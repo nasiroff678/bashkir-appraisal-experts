@@ -27,7 +27,7 @@ jobs:
         run: npm run build
 
       - name: Deploy to Beget via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4
+    uses: SamKirkland/FTP-Deploy-Action@v3.1
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
